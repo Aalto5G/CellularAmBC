@@ -1,7 +1,6 @@
 /*
 
-  Tests HW interface 
-
+  LTE receiver and the main interface to USRP 
 
   Kalle Ruttik
   21.09.2022

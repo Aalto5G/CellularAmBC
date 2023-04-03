@@ -6,7 +6,7 @@
 
 //  g++ -std=c++17 LTE_RX_StateMachine.cpp -lfftw3f -lfftw3 -luhd -lboost_system -o rxSTM
 //  run the code by
-//  ./rxSTM -f 486e6 -s 327AAA6 -g 45
+// 
 
 // #include "Headers.hpp"
 // #include "Hardware.hpp"

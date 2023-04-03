@@ -1,14 +1,12 @@
 /*
-
   LTE receiver and the main interface to USRP 
-
   Kalle Ruttik
   21.09.2022
  */
 
 //  g++ -std=c++17 LTE_RX_StateMachine.cpp -lfftw3f -lfftw3 -luhd -lboost_system -o rxSTM
 //  run the code by
-//  ./rx
+//  ./rxSTM -f 486e6 -s 327AAA6 -g 45
 
 // #include "Headers.hpp"
 // #include "Hardware.hpp"
@@ -42,6 +40,10 @@
 #include "../../Code/pcr_4g/C/RAN/PHY/OUT_INTERFACE.hpp"
 */
 
+
+using namespace std;
+ 
+
 /***********************************************************************
  * Signal handlers
  **********************************************************************/
@@ -63,7 +65,11 @@ int main(int argc, char* argv[])
 
       int option = 0;
      //double tx_freq = 2.48e9;
-      double dl_freq = 481e6;
+     // double dl_freq = 486e6;
+     //double dl_freq = 681e6;
+     // double dl_freq = 796e6; // DNA&Telia 796 Telia 806 Elisa 816
+     double dl_freq = 806e6;
+     // double dl_freq = 816e6;
       double spectrum_downscale = 2.0;
       int fftSize = 2048/spectrum_downscale;
       int syncSearchSize = fftSize*8;
@@ -79,8 +85,41 @@ int main(int argc, char* argv[])
      int fft_size = 1024;
      int fft_size_for_sync = 8*1024;
 
-     // uhd::device_addr_t args =  (uhd::device_addr_t)"serial=308F980";
-     uhd::device_addr_t args =  (uhd::device_addr_t)"serial=3131082";
+     //uhd::device_addr_t args =  (uhd::device_addr_t)"serial=308F980";
+     uhd::device_addr_t args =  (uhd::device_addr_t)"serial=327AAA6";
+     // uhd::device_addr_t args =  (uhd::device_addr_t)"serial=32711E0";
+     // uhd::device_addr_t args =  (uhd::device_addr_t)"serial=3131082";
+
+    std::string s = "serial=";
+    for (int i = 1; i < argc; ++i)
+        {
+        if(strcmp(argv[i], "-f") == 0)
+          {
+          // std::cout << argv[i] <<" freq:"<<argv[i+1]<< "\n";          
+          dl_freq = atof(argv[i+1]);          
+          i++;
+          }
+        if(strcmp(argv[i], "-s") == 0)
+          {
+          // std::cout << argv[i] <<" serial nr:"<<argv[i+1]<< "\n";
+          s = s + argv[i+1];
+          // std::cout<<s<<std::endl;
+          args =  (uhd::device_addr_t)s;          
+          i++;
+          }
+        if(strcmp(argv[i], "-g") == 0)
+          {
+          // std::cout << argv[i] <<" rx_gain:"<<argv[i+1]<< "\n";
+          rx_gain = atof(argv[i+1]);
+          std::cout<<s<<std::endl;
+          i++;
+          }         
+        }
+        
+     std::cout <<" freq:"<< dl_freq<< " usrp serial id: "<<(string) s<< " rx_gain:"<<rx_gain<<"\n";
+        
+
+     //
      Hardware hw(args,dl_freq,spectrum_downscale,rx_gain);     
      
      SYNC_RX sync( fft_size, fft_size_for_sync,hw);

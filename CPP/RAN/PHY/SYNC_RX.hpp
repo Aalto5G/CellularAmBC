@@ -64,20 +64,145 @@ class SYNC_RX{
 	  m_hw.startUSRP();	
 	  return 0;
 	};
-	
+
 	int cellSearch()
 	{
 
-	  int startsCount = 0;
+      int decLevel = 7; // arbitrary level for deciding that there is correlation
+	  int maxLocation=-1;
+
+	  m_rx_long.resize(m_search_fft_size);
+
+      m_hw.getSamples(m_rx_long,m_search_fft_size);
+	
+      // correlate
+	  
+	  // FFT into freq domain
+	  m_pss->cellSearchRxFFT(&m_rx_long[0]);
+
+      
+      if(m_candidate_seq_inx == -1)
+	  // no candidate yet correlate with all the sequences 
+	  {
+
+        int tmp_max = 0;
+        for(int inx =0; inx < 3; inx++)
+	    {
+		  
+	      // Correlation for PSS seq_inx and search for the max
+	      m_pss->cellSearchCorrelateAndGetMaxForOneSeq(inx);
+		  if( m_pss->getMaxCorrValue(inx) > decLevel)
+		    {
+			  if( m_pss->getMaxCorrValue(inx) > tmp_max)
+			  {
+	  	        maxLocation = m_pss->getMaxCorrValueLocation(inx);
+
+			    m_candidate_seq_inx = inx;
+                m_startsCount = 0;  
+	  	        m_oldPeakLocation = (int)(m_hw.getRxTicks() - (m_search_fft_size - maxLocation));
+	  	        m_startsCount++;
+				tmp_max = m_pss->getMaxCorrValue(inx);
+			  }
+		    }
+	    }
+	  }
+	  else
+	  {
+		int seq_inx = m_candidate_seq_inx;
+	    m_pss->cellSearchCorrelateAndGetMaxForOneSeq(seq_inx);
+	
+	    // std::cout<<"found a candidate:"<<m_pss->getMaxCorrValue(seq_inx)<<std::endl;
+	    if(m_pss->getMaxCorrValue(seq_inx)>decLevel)
+	    {
+	  	  maxLocation = m_pss->getMaxCorrValueLocation(seq_inx);
+
+		   std::cout<<"found a candidate group :"<<seq_inx<<" max value:"<<m_pss->getMaxCorrValue(seq_inx)<<" location:"<<maxLocation<<std::endl;
+		
+		  int currentPeakLoc = (int)(m_hw.getRxTicks()  -(m_search_fft_size - maxLocation));
+		  int decVariable = currentPeakLoc - m_oldPeakLocation;
+		  if( abs(decVariable - 76800) > 5*m_spectrum_scaling)
+               // resets counter
+		  {
+            m_startsCount=0;
+			m_candidate_seq_inx = -1;
+			 std::cout<<"candidate not good"<<std::endl;
+		  }
+		  else
+                // everything fine 
+		  {
+		    m_startsCount++;
+		  }
+		  m_oldPeakLocation = currentPeakLoc;
+		}
+/*		else if(((m_hw.getRxTicks()+m_search_fft_size)-m_oldPeakLocation) > (2*(76800 +5*m_spectrum_scaling)))
+		{
+            m_startsCount=0;
+			m_candidate_seq_inx = -1;
+			//std::cout<<"candidate not good"<<std::endl;
+		}
+*/
+	  }
+
+      
+      if(m_startsCount>2)
+      {
+	    // PSS id set
+	    N_id_1 = m_candidate_seq_inx;
+
+        // align peak to be in the right location 
+	    // burn samples till next subframe with PSS such that the starting sample is in beginning of the SF
+	    int tmpLocations = m_search_fft_size - maxLocation;
+	    //int samples_per_subframe = m_samples_per_TTI/2;
+	    int m_samples_per_TTI = 30720/m_spectrum_scaling;
+	    int samples_to_burn = (m_samples_per_TTI/2*9+m_fft_size)-tmpLocations;
+	    unsigned long long expected_rx_Ticks = m_hw.getRxTicks() + samples_to_burn;
+	   
+	    m_hw.burnSamples(samples_to_burn);	
+	    if(m_hw.getRxTicks() != expected_rx_Ticks)
+	    {
+	  	  samples_to_burn = m_samples_per_TTI/m_spectrum_scaling*10 - (m_hw.getRxTicks() -expected_rx_Ticks);
+	  	  m_hw.burnSamples(samples_to_burn);	
+	    }
+	  
+ 	    int subframe_size = 30720/2;
+	    m_rx_long.resize(subframe_size);
+
+	    std::cout<<"found a candidate group:"<<N_id_1<<std::endl;
+
+
+	    m_sync_state = SYNC_STATE::CELL_ID_SEARCH;
+	    m_cell_search = CELL_SEARCH_STATE_PSS::PSS_FOUND;
+	    m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_SEARCH;
+
+	    // resets the search temporal parameters.
+        m_startsCount = 0;
+		m_candidate_seq_inx = -1;
+	  }
+	  else 
+	  {
+		m_sync_state = SYNC_STATE::CELL_SEARCH;
+	    m_cell_search = CELL_SEARCH_STATE_PSS::PSS_NOT_FOUND;
+	    m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_NOT_FOUND;
+	  }
+
+    return 0;
+	}
+
+
+	int cellSearchv2()
+	{
+
+	  int m_startsCount = 0;
 	  int oldPeakLocation = 0;
 
 	  int maxLocation=-1;
-	  int decLevel = 5; // arbitrary level for deciding that there is correlation
+	  int decLevel = 7; // arbitrary level for deciding that there is correlation
 	  int decVariable =0;
 
 	  m_rx_long.resize(m_search_fft_size);
 	  
-	  int seq_inx =0;
+	  int seq_inx = 0;
+
 	  bool syncCandidate = true;
 	  while(syncCandidate)
 	  //for(int i3=0;i3<10;i3++)
@@ -88,6 +213,8 @@ class SYNC_RX{
 	  // correlate
 	  // FFT into freq domain
 	  m_pss->cellSearchRxFFT(&m_rx_long[0]);
+
+
 	  // Correlation for PSS seq_inx and search for the max
 	  m_pss->cellSearchCorrelateAndGetMaxForOneSeq(seq_inx);
 	
@@ -96,13 +223,13 @@ class SYNC_RX{
 	  {
 	  	maxLocation = m_pss->getMaxCorrValueLocation(seq_inx);
 	  	
-               std::cout<<"found a candidate:"<<m_pss->getMaxCorrValue(seq_inx)<<" location:"<<maxLocation<<std::endl;
+               std::cout<<"found a candidate group :"<<seq_inx<<" max value:"<<m_pss->getMaxCorrValue(seq_inx)<<" location:"<<maxLocation<<std::endl;
          
                // startsCount defines how many times the correlation peak has been in expected location      
-	  	if(startsCount==0)
+	  	if(m_startsCount==0)
 	  	{
 	  	  oldPeakLocation = (int)(m_hw.getRxTicks() - (m_search_fft_size - maxLocation));
-	  	  startsCount++;
+	  	  m_startsCount++;
 	  	}
 	  	else
 	  	{
@@ -111,28 +238,28 @@ class SYNC_RX{
 		if( abs(decVariable - 76800) > 5*m_spectrum_scaling)
                // resets counter
 		{
-                 startsCount=0;
+                 m_startsCount=0;
 		}
 		else
                 // everything fine 
 		{
-		  startsCount++;
+		  m_startsCount++;
 		}
 		oldPeakLocation = currentPeakLoc;
 	  	}
-               //std::cout<<" starts count:"<<startsCount<< " PeakLoc:"<<oldPeakLocation<<" decVariable:"<<decVariable<<std::endl;
+               //std::cout<<" starts count:"<<m_startsCount<< " PeakLoc:"<<oldPeakLocation<<" decVariable:"<<decVariable<<std::endl;
 	  }
-            if(startsCount>2)
-            // there has been peak sufficiently many times in right position
-            {
-		syncCandidate = false;
+        if(m_startsCount>2)
+        // there has been peak sufficiently many times in right position
+        {
+		  syncCandidate = false;
 	    }
-          }
+      }
 
 	  // PSS id set
 	  N_id_1 = seq_inx;
 
-          // align peak to be in the right location 
+      // align peak to be in the right location 
 	  // burn samples till next subframe with PSS such that the starting sample is in beginning of the SF
 	  int tmpLocations = m_search_fft_size - maxLocation;
 	  //int samples_per_subframe = m_samples_per_TTI/2;
@@ -150,9 +277,11 @@ class SYNC_RX{
 	  int subframe_size = 30720/2;
 	  m_rx_long.resize(subframe_size);
 
-		m_sync_state = SYNC_STATE::CELL_ID_SEARCH;
-		m_cell_search = CELL_SEARCH_STATE_PSS::PSS_FOUND;
-		m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_SEARCH;
+	  m_sync_state = SYNC_STATE::CELL_ID_SEARCH;
+	  m_cell_search = CELL_SEARCH_STATE_PSS::PSS_FOUND;
+	  m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_SEARCH;
+
+	  // resets the search temporal parameters.
 
 	  return 0;
 	};
@@ -423,6 +552,9 @@ class SYNC_RX{
 	// states 
 	int m_cell_lost = 0; // tracks if sync is lost
 
+    int m_startsCount = 0;
+	int m_candidate_seq_inx = -1;
+	int m_oldPeakLocation = 0;
 	SYNC_STATE m_sync_state = SYNC_STATE::CELL_SEARCH;
 	CELL_SEARCH_STATE_PSS m_cell_search = CELL_SEARCH_STATE_PSS::PSS_NOT_FOUND;
 	CELLID_SEARCH_STATE_SSS m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_NOT_FOUND;

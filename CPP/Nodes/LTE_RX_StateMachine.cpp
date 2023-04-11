@@ -1,12 +1,15 @@
 /*
-  LTE receiver and the main interface to USRP 
+
+  Tests HW interface 
+
+
   Kalle Ruttik
   21.09.2022
  */
 
-//  g++ -std=c++17 LTE_RX_StateMachine.cpp -lfftw3f -lfftw3 -luhd -lboost_system -o rxSTM
+//  g++ -O3 -std=c++17 LTE_RX_StateMachine.cpp -lfftw3f -lfftw3 -luhd -lboost_system -o rxSTM
 //  run the code by
-// 
+//  ./rxSTM -f 486e6 -s 327AAA6 -g 45
 
 // #include "Headers.hpp"
 // #include "Hardware.hpp"
@@ -65,10 +68,10 @@ int main(int argc, char* argv[])
 
       int option = 0;
      //double tx_freq = 2.48e9;
-     // double dl_freq = 486e6;
+     double dl_freq = 486e6;
      //double dl_freq = 681e6;
      // double dl_freq = 796e6; // DNA&Telia 796 Telia 806 Elisa 816
-     double dl_freq = 806e6;
+     //double dl_freq = 806e6;
      // double dl_freq = 816e6;
       double spectrum_downscale = 2.0;
       int fftSize = 2048/spectrum_downscale;
@@ -116,7 +119,7 @@ int main(int argc, char* argv[])
           }         
         }
         
-     std::cout <<" freq:"<< dl_freq<< " usrp serial id: "<<(string) s<< " rx_gain:"<<rx_gain<<"\n";
+     std::cout <<" freq:"<< dl_freq<< " id: "<<(string) s<< " rx_gain:"<<rx_gain<<"\n";
         
 
      //
@@ -151,7 +154,7 @@ int main(int argc, char* argv[])
      {
      if (stop_signal_called) break;
 
-       switch(sync.getSyncState())
+      switch(sync.getSyncState())
        // switch(tmpStateVar)
       {
         case SYNC_STATE::CELL_SEARCH:
@@ -159,40 +162,40 @@ int main(int argc, char* argv[])
           sync.cellSearch();
           //  tmpStateVar = SYNC_STATE::CELL_ID_SEARCH;
           //  tmpStateVar = sync.getSyncState();
-          break;
+        break;
         }
         case SYNC_STATE::CELL_ID_SEARCH:
         {
-        
+          
           sync.cellIdSearch();
           sf.initRx(sync.getCellID(),sync.getNRBDL());
           // tmpStateVar = sync.getSyncState();
-          break;
+        break;
         }
         case SYNC_STATE::CELL_TRACKING:
         {
-        
           sync.getSF();
-      int tmpFrameInx = sync.getFrameNumber();
-      int tmpSlotInx = sync.getSlotNumber();
+          int tmpFrameInx = sync.getFrameNumber();
+          int tmpSlotInx = sync.getSlotNumber();
           sf.receiveSF(sync.getFrameNumber(),sync.getSlotNumber(),sync.getNRBDL(), sync.getSFStart(), sync.getFFTSize());
-      // copy received data into tx msg
-      msgTmp[0]=(uint8_t)tmpFrameInx;
-      msgTmp[1]=(uint8_t)tmpSlotInx;
-      memcpy(&msgTmp[2],sf.getChannelCoeff(),7*sizeof(double));
+          // copy received data into tx msg
+          msgTmp[0]=(uint8_t)tmpFrameInx;
+          msgTmp[1]=(uint8_t)tmpSlotInx;
+          memcpy(&msgTmp[2],sf.getChannelCoeff(),7*sizeof(double));
 
-      memcpy(&msg[1+(tmpFrameInx*2+tmpSlotInx)*onePacketLen],&msgTmp[0],onePacketLen);
-     	  
-      if(tmpFrameInx ==9 & tmpSlotInx == 1)
-       {
-         out.sendData(msg,msg_length);
-         memset(&msg[0],0,msg_length);
-         msg[0]=tmpHeader;
-         std::cout<<" data sent out:"<< tmpFrameInx<<" "<< tmpSlotInx<<std::endl;
-       }  
-      // tmpStateVar = sync.getSyncState();
-      break;     	     
-          }
+          memcpy(&msg[1+(tmpFrameInx*2+tmpSlotInx)*onePacketLen],&msgTmp[0],onePacketLen);
+     	
+          // sends data to the BC receiver process 
+          if(tmpFrameInx ==9 & tmpSlotInx == 1)
+            {
+              out.sendData(msg,msg_length);
+              memset(&msg[0],0,msg_length);
+              msg[0]=tmpHeader;
+              std::cout<<" data sent out:"<< tmpFrameInx<<" "<< tmpSlotInx<<std::endl;
+            }  
+          // tmpStateVar = sync.getSyncState();
+        break;     	     
+        }
         // default: 
         //  tmpStateVar = SYNC_STATE::CELL_ID_SEARCH;
        }

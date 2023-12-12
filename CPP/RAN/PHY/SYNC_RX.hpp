@@ -23,11 +23,21 @@ class SYNC_RX{
 	 
 	 m_subframe_size = 30720/m_spectrum_scaling;
 	 // m_slot_size = 30720/2/m_spectrum_scaling;
- 
+	
+	if(m_spectrum_scaling == 1.0)
+	{
+		m_NRBDL=100;
+	}
+	else if(m_spectrum_scaling == 2.0)
+	{
+		m_NRBDL=50;
+	}
+
 	 for( int i1=0; i1<7; i1++)
  	   cp[i1] = cp_max[i1]/m_spectrum_scaling; 
 	 
 	 m_pss = new PSS(m_fft_size,m_search_fft_size);
+	 m_sss = new SSS(m_fft_size);
 	 
 	 m_rx_long.resize(m_search_fft_size);
 	 
@@ -47,6 +57,7 @@ class SYNC_RX{
 	};
 	~SYNC_RX()
 	{
+		delete(m_sss);
 		delete(m_pss);
 		for(int i1=0;i1<7;i1++)
 		{
@@ -68,25 +79,25 @@ class SYNC_RX{
 	int cellSearch()
 	{
 
-      int decLevel = 7; // arbitrary level for deciding that there is correlation
+          int decLevel = 7; // arbitrary level for deciding that there is correlation
 	  int maxLocation=-1;
 
 	  m_rx_long.resize(m_search_fft_size);
 
-      m_hw.getSamples(m_rx_long,m_search_fft_size);
+          m_hw.getSamples(m_rx_long,m_search_fft_size);
 	
-      // correlate
+          // correlate
 	  
 	  // FFT into freq domain
 	  m_pss->cellSearchRxFFT(&m_rx_long[0]);
 
       
-      if(m_candidate_seq_inx == -1)
+          if(m_candidate_seq_inx == -1)
 	  // no candidate yet correlate with all the sequences 
 	  {
 
-        int tmp_max = 0;
-        for(int inx =0; inx < 3; inx++)
+          int tmp_max = 0;
+          for(int inx =0; inx < 3; inx++)
 	    {
 		  
 	      // Correlation for PSS seq_inx and search for the max
@@ -108,7 +119,7 @@ class SYNC_RX{
 	  }
 	  else
 	  {
-		int seq_inx = m_candidate_seq_inx;
+           int seq_inx = m_candidate_seq_inx;
 	    m_pss->cellSearchCorrelateAndGetMaxForOneSeq(seq_inx);
 	
 	    // std::cout<<"found a candidate:"<<m_pss->getMaxCorrValue(seq_inx)<<std::endl;
@@ -120,12 +131,12 @@ class SYNC_RX{
 		
 		  int currentPeakLoc = (int)(m_hw.getRxTicks()  -(m_search_fft_size - maxLocation));
 		  int decVariable = currentPeakLoc - m_oldPeakLocation;
-		  if( abs(decVariable - 76800) > 5*m_spectrum_scaling)
+		  if( abs(decVariable - (153600/m_spectrum_scaling)) > 5*m_spectrum_scaling)
                // resets counter
 		  {
-            m_startsCount=0;
-			m_candidate_seq_inx = -1;
-			 std::cout<<"candidate not good"<<std::endl;
+                    m_startsCount=0;
+		     m_candidate_seq_inx = -1;
+		     std::cout<<"candidate PSS not good"<<std::endl;
 		  }
 		  else
                 // everything fine 
@@ -164,7 +175,7 @@ class SYNC_RX{
 	  	  m_hw.burnSamples(samples_to_burn);	
 	    }
 	  
- 	    int subframe_size = 30720/2;
+ 	    int subframe_size = 30720/m_spectrum_scaling;
 	    m_rx_long.resize(subframe_size);
 
 	    std::cout<<"found a candidate group:"<<N_id_1<<std::endl;
@@ -175,20 +186,21 @@ class SYNC_RX{
 	    m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_SEARCH;
 
 	    // resets the search temporal parameters.
-        m_startsCount = 0;
-		m_candidate_seq_inx = -1;
+            m_startsCount = 0;
+	     m_candidate_seq_inx = -1;
 	  }
 	  else 
 	  {
-		m_sync_state = SYNC_STATE::CELL_SEARCH;
+	    m_sync_state = SYNC_STATE::CELL_SEARCH;
 	    m_cell_search = CELL_SEARCH_STATE_PSS::PSS_NOT_FOUND;
 	    m_cell_id_search = CELLID_SEARCH_STATE_SSS::SSS_NOT_FOUND;
 	  }
 
-    return 0;
+        return 0;
 	}
 
 
+ 	// old version of the cell search
 	int cellSearchv2()
 	{
 
@@ -316,11 +328,11 @@ class SYNC_RX{
 
        std::cout<<" pss max:"<< max_value<<" pss loc:"<< max_location<<std::endl;
 
-	m_sss.searchFrameNumberFromCorrWithSSS(&m_tmp_subframeT[5][0], N_id_1, &frame_number , &estSequence, &maxLoc);
-	std::cout<<"N_id_1:"<<N_id_1<<" estimated frameNr"<<frame_number <<" Estimated SSS sequence Nr:"<<estSequence<<" Maximum Location in Time:"<<maxLoc<<std::endl;
+	m_sss->searchFrameNumberFromCorrWithSSS(&m_tmp_subframeT[5][0], N_id_1, &frame_number , &estSequence, &maxLoc);
 
 	cell_id = estSequence;
 	N_id_2 = (cell_id-N_id_1)/3;
+	std::cout<<"cell ID:"<<cell_id<<" N_id_1:"<<N_id_1<<" N_id_2:"<<N_id_2<<" estimated frameNr"<<frame_number<<" Maximum Location in Time:"<<maxLoc<<std::endl;
 
        // has to assign slot_count and slot_number by +1 since we handle slot 0 at moment
 	m_frame_number = frame_number;
@@ -449,7 +461,7 @@ class SYNC_RX{
 	//
 	int getNRBDL()
 	{
-		return NRBDL;
+		return m_NRBDL;
 	};
 	int getCellID()
 	{
@@ -489,6 +501,12 @@ class SYNC_RX{
 		return m_fft_size;
 	};
 
+	cFloat** getSFStartT()
+	{
+		return m_tmp_subframeT;
+	};
+
+
 
 	bool isPSSSubframe()
 	{
@@ -525,8 +543,8 @@ class SYNC_RX{
 	std::vector<std::complex<float>> m_rx_long;
 	
 	PSS* m_pss;
-	SSS m_sss;
-	int NRBDL = 50;
+	SSS* m_sss;
+	int m_NRBDL = 50;
 	
 	int N_id_1 = -1;
 	int N_id_2 = -1;
@@ -552,7 +570,7 @@ class SYNC_RX{
 	// states 
 	int m_cell_lost = 0; // tracks if sync is lost
 
-    int m_startsCount = 0;
+        int m_startsCount = 0;
 	int m_candidate_seq_inx = -1;
 	int m_oldPeakLocation = 0;
 	SYNC_STATE m_sync_state = SYNC_STATE::CELL_SEARCH;

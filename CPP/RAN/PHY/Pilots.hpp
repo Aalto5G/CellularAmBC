@@ -145,6 +145,7 @@ class Pilots{
 
 	int p=0;
 	int i1 =0;
+	m_nushift = (m_cell_id%6);
 	for(int inx_sf = 0;inx_sf < m_number_of_subframes; inx_sf++)
 	{
 		for(int inx_slot = 0;inx_slot < m_number_of_slots; inx_slot++)

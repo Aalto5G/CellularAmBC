@@ -10,11 +10,15 @@
 class SSS{
 	
 	public: 
-	SSS(){
+	SSS(int w_fft_size):m_fftSize(w_fft_size)
+{
 	
 	std::cout<<"SSS initialization"<<std::endl;
 	// FFT preparation 
-	
+
+	m_spectrum_scaling = 2048/m_fftSize;
+
+
 	// All the SSS sequences in frequency domain and their conjugates
 	m_fftSizeSSS = 128;
     m_sssM0Freq_conj = new cFloat*[504]; 
@@ -73,7 +77,7 @@ class SSS{
 	}
 
 	
-	m_fftSize = 1024;
+	//m_fftSize = 2048/m_scaling_factor;
 	m_rxSSST = new cFloat[m_fftSize];
 	m_rxSSSF = new cFloat[m_fftSize];
 	m_rxSSSF_short = new cFloat[m_fft128];
@@ -267,6 +271,12 @@ class SSS{
 	};
 	
 	public:
+
+	//int m_subframe_size = 30720;
+	//int m_slot_size = 30720/2;
+	int m_spectrum_scaling = 1;
+
+
 	int m_fftSize;
 	int m_fftSizeSSS;
 	int m_fft128 = 128;

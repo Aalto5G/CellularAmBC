@@ -16,6 +16,7 @@ class SF{
 	SF()
 	{
 	 m_channel_coeff = new double[7];
+	 
 	};
 	
 	~SF()
@@ -25,6 +26,7 @@ class SF{
 	int initRx(int w_cell_id,int w_NRBDL)
 	{
 		p.generateAllPilots(w_cell_id, w_NRBDL);
+		//m_rxData = new cFloat[40*7*NRDBL];
 		return 0;
 	};
 	
@@ -58,6 +60,8 @@ class SF{
 		//std::fill(&m_channel_coeff[0],&m_channel_coeff[0]+7, (cFloat)(0.0, 0.0));
 		std::fill(&m_channel_coeff[0],&m_channel_coeff[0]+7, (double)(0.0));
 		
+		std::cout<<subframe_number<<" "<<slot_number<<" ";
+
 		for(int i1 = 0;i1<7;i1++)
 		{
 		pilot_symbol_l = 0;
@@ -105,5 +109,6 @@ class SF{
 	Pilots p;	
 	
 	double* m_channel_coeff;
+	
 };
 
